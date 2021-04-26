@@ -1,5 +1,6 @@
 package de.dertoaster.dtarmory.data.implementation.propfile;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,8 @@ public class DTLibDataAmmo implements IDTArmoryAmmoData, IConfigurable {
 	private boolean itemUnbreakable;
 	
 	private Material itemMaterial;
+	
+	private List<String> itemDescription;
 
 	public DTLibDataAmmo() {
 		this.entries = new HashMap<String, PropertyEntry<?>>();
@@ -36,6 +39,8 @@ public class DTLibDataAmmo implements IDTArmoryAmmoData, IConfigurable {
 		this.entries.put("itemunbreakable", new PropertyEntry<Boolean>("false", PropertyDataTypes.DATA_TYPE_BOOLEAN, this::isItemUnbreakable, this::setItemUnbreakable));
 		
 		this.entries.put("itemid", new PropertyEntry<String>("stick", PropertyDataTypes.DATA_TYPE_STRING, this::getMinecraftItemIDAsString, this::setMinecraftItemID));
+		
+		this.entries.put("description", new PropertyEntry<String[]>("", PropertyDataTypes.DATA_TYPE_STRING_ARRAY, this::getDescriptionAsStringArray, this::setDescription));
 	}
 
 	@Override
@@ -70,14 +75,24 @@ public class DTLibDataAmmo implements IDTArmoryAmmoData, IConfigurable {
 
 	@Override
 	public List<String> getItemDescription() {
-		// TODO Auto-generated method stub
-		return null;
+		return this.itemDescription;
 	}
 
 	@Override
 	public void setItemDescription(List<String> data) {
-		// TODO Auto-generated method stub
-
+		this.itemDescription = data;
+	}
+	
+	
+	private void setDescription(String[] data) {
+		List<String> tmpList = new ArrayList<String>(data.length);
+		for(String s : data) {
+			tmpList.add(s);
+		}
+	}
+	
+	private String[] getDescriptionAsStringArray() {
+		return this.getItemDescription().toArray(new String[this.getItemDescription().size()]);
 	}
 
 	@Override
