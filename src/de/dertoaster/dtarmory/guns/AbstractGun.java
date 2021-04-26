@@ -22,6 +22,7 @@ import org.bukkit.inventory.ItemStack;
 
 import de.dertoaster.dtarmory.DTArmory;
 import de.dertoaster.dtarmory.ammunition.ItemAmmunition;
+import de.dertoaster.dtarmory.data.IDTArmoryGunData;
 import de.dertoaster.dtlib.spigot.items.CustomItemBase;
 import de.dertoaster.dtlib.spigot.items.CustomItemRegistry;
 import de.dertoaster.dtlib.spigot.items.ItemDamageUtil;
@@ -33,21 +34,32 @@ public abstract class AbstractGun extends CustomItemBase {
 	public static final NamespacedKey COOLDOWN_DATA_KEY = new NamespacedKey(DTArmory.getInstance(), "dtarmory_cooldown_key");
 	public static final NamespacedKey RELOADING_DATA_KEY = new NamespacedKey(DTArmory.getInstance(), "dtarmory_reloading_key");
 
-	public AbstractGun(String itemID, CustomItemRegistry<AbstractGun> registry) {
-		super(itemID, registry);
+	protected final IDTArmoryGunData gunData;
+	
+	AbstractGun(String itemID, IDTArmoryGunData data) {
+		super(itemID, DTArmory.GUN_REGISTRY);
+		this.gunData = data;
 	}
 
-	protected abstract Optional<String> getUsePermission();
+	protected Optional<String> getUsePermission() {
+		return this.gunData.getPermission();
+	}
 
 	protected abstract void onShoot(ItemStack item, PlayerInteractEvent event);
 
 	protected abstract void onSecondary(ItemStack item, PlayerInteractEvent event);
 
-	protected abstract int getMaxAmmo();
+	public int getMaxAmmo() {
+		return this.gunData.getAmmoCapacity();
+	}
 	
 	//Measured in milliseconds
-	protected abstract long getReloadTime();
-	protected abstract long getShotDelay();
+	protected long getReloadTime() {
+		return this.gunData.getReloadDuration();
+	}
+	protected long getShotDelay() {
+		return this.gunData.getShotDelay();
+	}
 
 	/*
 	 * Return the amount of shots that are loaded into the weapon, if it is not loaded, it will return -1
