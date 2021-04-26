@@ -5,11 +5,16 @@ import javax.annotation.Nullable;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import de.dertoaster.dtarmory.ammunition.DTArmoryAmmoRegistry;
+import de.dertoaster.dtarmory.guns.DTArmoryGunRegistry;
 import de.dertoaster.dtlib.spigot.items.IPluginProvider;
 
 public class DTArmory extends JavaPlugin implements IPluginProvider {
 	
 	private static DTArmory INSTANCE;
+	
+	public static DTArmoryAmmoRegistry AMMO_REGISTRY;
+	public static DTArmoryGunRegistry GUN_REGISTRY;
 	
 	
 	@Override
@@ -17,6 +22,9 @@ public class DTArmory extends JavaPlugin implements IPluginProvider {
 		super.onEnable();
 		
 		INSTANCE = this;
+		
+		DTArmory.AMMO_REGISTRY = new DTArmoryAmmoRegistry(this);
+		DTArmory.GUN_REGISTRY = new DTArmoryGunRegistry();
 	}
 	
 	@Nullable
