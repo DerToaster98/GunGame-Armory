@@ -2,6 +2,8 @@ package de.dertoaster.dtarmory.guns;
 
 import java.util.Optional;
 
+import javax.annotation.Nonnull;
+
 import org.bukkit.GameMode;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Entity;
@@ -15,9 +17,11 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import de.dertoaster.dtarmory.DTArmory;
+import de.dertoaster.dtarmory.ammunition.ItemAmmunition;
 import de.dertoaster.dtlib.spigot.items.CustomItemBase;
 import de.dertoaster.dtlib.spigot.items.CustomItemRegistry;
 import de.dertoaster.dtlib.spigot.items.ItemDamageUtil;
@@ -45,7 +49,10 @@ public abstract class AbstractGun extends CustomItemBase {
 	protected abstract long getReloadTime();
 	protected abstract long getShotDelay();
 
-	protected int getRemainingAmmo(ItemStack item) {
+	/*
+	 * Return the amount of shots that are loaded into the weapon, if it is not loaded, it will return -1
+	 */
+	public static int getRemainingAmmo(ItemStack item) {
 		Optional<Integer> itemData = ItemDataUtil.tryGetPersistentInteger(MAGAZINE_DATA_KEY, item);
 		if(itemData.isPresent()) {
 			return itemData.get();
@@ -55,13 +62,13 @@ public abstract class AbstractGun extends CustomItemBase {
 	}
 	
 	protected boolean hasFreeMagazineCapacity(ItemStack item) {
-		return this.getRemainingAmmo(item) < this.getMaxAmmo();
+		return AbstractGun.getRemainingAmmo(item) < this.getMaxAmmo();
 	}
 	
 	/*
-	 * Checks if the RELOADING_DATA_KEY has been set
+	 * Checks if the RELOADING_DATA_KEY has been set to true, will return false otherwise
 	 */
-	protected boolean isReloading(ItemStack item) {
+	public static boolean isReloading(ItemStack item) {
 		Optional<String> stringData =  ItemDataUtil.tryGetPersistentString(RELOADING_DATA_KEY, item);
 		if(stringData.isPresent()) {
 			return Boolean.valueOf(stringData.get());
@@ -71,7 +78,7 @@ public abstract class AbstractGun extends CustomItemBase {
 	/*
 	 * Checks if the time stored in COOLDOWN_DATA_KEY is already in the past (or now)
 	 */
-	protected boolean isCurrentCooldownOver(ItemStack item) {
+	public static boolean isCurrentCooldownOver(ItemStack item) {
 		Optional<Long> itemData = ItemDataUtil.tryGetPersistentLong(COOLDOWN_DATA_KEY, item);
 		if(itemData.isPresent()) {
 			//Saved data is the time at when it can shoot again. 
@@ -97,10 +104,10 @@ public abstract class AbstractGun extends CustomItemBase {
 	@Override
 	public void onRightClick(ItemStack item, PlayerInteractEvent event) {
 		if (hasPermission(event.getPlayer())) {
-			if(this.isCurrentCooldownOver(item)) {
+			if(AbstractGun.isCurrentCooldownOver(item)) {
 				this.onSecondary(item, event);
 				//Since the cooldown is over, let's check if we were reloading
-				if(this.isReloading(item)) {
+				if(AbstractGun.isReloading(item)) {
 					//We were reloading, let's remove the flag
 					if(!ItemDataUtil.tryRemoveData(RELOADING_DATA_KEY, item)) {
 						//Something went wrong => TODO: Log this shit :D
@@ -119,7 +126,7 @@ public abstract class AbstractGun extends CustomItemBase {
 	@Override
 	public void onLeftClick(ItemStack item, PlayerInteractEvent event) {
 		if (hasPermission(event.getPlayer())) {
-			if(this.isCurrentCooldownOver(item)) {
+			if(AbstractGun.isCurrentCooldownOver(item)) {
 				if(!this.hasAmmo(item)) {
 					//TODO: Play out of ammo sound
 					
@@ -129,7 +136,7 @@ public abstract class AbstractGun extends CustomItemBase {
 				else {
 					this.onShoot(item, event);
 					//Since the cooldown is over, let's check if we were reloading
-					if(this.isReloading(item)) {
+					if(AbstractGun.isReloading(item)) {
 						//We were reloading, let's remove the flag
 						if(!ItemDataUtil.tryRemoveData(RELOADING_DATA_KEY, item)) {
 							//Something went wrong => TODO: Log this shit :D
@@ -142,7 +149,7 @@ public abstract class AbstractGun extends CustomItemBase {
 						//Something went wrong => TODO: Log this shit
 					}
 				}
-			} else if(this.isReloading(item)) {
+			} else if(AbstractGun.isReloading(item)) {
 				this.removeReloadingMarkerOnItemMovement(item);
 			}
 		}
@@ -150,7 +157,7 @@ public abstract class AbstractGun extends CustomItemBase {
 	}
 
 	private void updateItemMagazine(ItemStack item) {
-		int currentAmmo = this.getRemainingAmmo(item);
+		int currentAmmo = AbstractGun.getRemainingAmmo(item);
 		currentAmmo--;
 		double percentage = currentAmmo / this.getMaxAmmo();
 		//Update magazine counter
@@ -167,8 +174,8 @@ public abstract class AbstractGun extends CustomItemBase {
 	@Override
 	public void onDrop(ItemStack item, PlayerDropItemEvent event) {
 		if (hasPermission(event.getPlayer())) {
-			if(!this.isCurrentCooldownOver(item)) {
-				if(this.isReloading(item)) {
+			if(!AbstractGun.isCurrentCooldownOver(item)) {
+				if(AbstractGun.isReloading(item)) {
 					event.setCancelled(true);
 					return;
 				}
@@ -189,14 +196,17 @@ public abstract class AbstractGun extends CustomItemBase {
 		if(player.getGameMode().equals(GameMode.CREATIVE)) {
 			return true;
 		}
-		//TODO: check for the correct ammo being present
+		//DONE: check for the correct ammo being present
+		if(!containsValidAmmo(player.getInventory())) {
+			return false;
+		}
 		//TODO: Remove ammo items WHEN RELOAD IS FINISHED
 		//TODO: Add "used during reload" marker on ALL AMMO ITEMS of the needed ammo, that is to prevent the player removing the ammo before the reloading is over
 		return true;
 	}
 
 	protected boolean hasAmmo(ItemStack item) {
-		return this.getRemainingAmmo(item) > 0;
+		return AbstractGun.getRemainingAmmo(item) > 0;
 	}
 
 	@Override
@@ -230,11 +240,31 @@ public abstract class AbstractGun extends CustomItemBase {
 	}
 	
 	private void removeReloadingMarkerOnItemMovement(ItemStack item) {
-		if(this.isReloading(item)) {
+		if(AbstractGun.isReloading(item)) {
 			if(!(ItemDataUtil.tryRemoveData(COOLDOWN_DATA_KEY, item) && ItemDataUtil.tryRemoveData(RELOADING_DATA_KEY, item))) {
 				//Something went wrong => TODO: Log this shit
 			}
 		}
 	}
-
+	
+	//Ammo handling
+	protected ItemAmmunition acceptedAmmo;
+	
+	protected boolean isAmmoValid(@Nonnull ItemAmmunition ammo) {
+		return this.acceptedAmmo == ammo;
+	}
+	
+	public boolean containsValidAmmo(@Nonnull Inventory inventory) {
+		CustomItemRegistry<ItemAmmunition> ammoReg = DTArmory.AMMO_REGISTRY;
+		for(ItemStack stack : inventory.getStorageContents()) {
+			Optional<ItemAmmunition> ammoOptional = ammoReg.getEntry(stack);
+			if(ammoOptional.isPresent()) {
+				return this.isAmmoValid(ammoOptional.get());
+			}
+		}
+		return false;
+	}
+	
+	
+	
 }
