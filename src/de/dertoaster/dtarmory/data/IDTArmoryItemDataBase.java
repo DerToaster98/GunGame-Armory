@@ -1,6 +1,7 @@
 package de.dertoaster.dtarmory.data;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.bukkit.Material;
 
@@ -26,5 +27,7 @@ public interface IDTArmoryItemDataBase {
 	public Material getMinecraftItemID();
 	public boolean isItemUnbreakable();
 	public void setItemUnbreakable(boolean value);
+	
+	public Optional<String> getPermission();
 
 }
