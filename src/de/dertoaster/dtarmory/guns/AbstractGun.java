@@ -35,10 +35,12 @@ public abstract class AbstractGun extends CustomItemBase {
 	public static final NamespacedKey RELOADING_DATA_KEY = new NamespacedKey(DTArmory.getInstance(), "dtarmory_reloading_key");
 
 	protected final IDTArmoryGunData gunData;
+	protected final ItemAmmunition requiredAmmo;
 	
 	AbstractGun(String itemID, IDTArmoryGunData data) {
 		super(itemID, DTArmory.GUN_REGISTRY);
 		this.gunData = data;
+		this.requiredAmmo = DTArmory.AMMO_REGISTRY.getEntry(this.gunData.getRequiredAmmo()).get();
 	}
 
 	protected Optional<String> getUsePermission() {
@@ -118,18 +120,20 @@ public abstract class AbstractGun extends CustomItemBase {
 		if (hasPermission(event.getPlayer())) {
 			if(AbstractGun.isCurrentCooldownOver(item)) {
 				this.onSecondary(item, event);
+				//No, we don't need ammo here
 				//Since the cooldown is over, let's check if we were reloading
-				if(AbstractGun.isReloading(item)) {
+				/*if(AbstractGun.isReloading(item)) {
 					//We were reloading, let's remove the flag
 					if(!ItemDataUtil.tryRemoveData(RELOADING_DATA_KEY, item)) {
 						//Something went wrong => TODO: Log this shit :D
 					}
-				}
+				}*/
+				//Well, we don't really need a cooldown for our secondary action, if at all we need a separate one...
 				//Let's add the shot cooldown to the item
-				long future = System.currentTimeMillis() + this.getShotDelay();
+				/*long future = System.currentTimeMillis() + this.getShotDelay();
 				if(!ItemDataUtil.trySetPersistentLong(COOLDOWN_DATA_KEY, future, item)) {
 					//Something went wrong => TODO: Log this shit
-				}
+				}*/
 			}
 		}
 		event.setCancelled(true);
@@ -140,20 +144,22 @@ public abstract class AbstractGun extends CustomItemBase {
 		if (hasPermission(event.getPlayer())) {
 			if(AbstractGun.isCurrentCooldownOver(item)) {
 				if(!this.hasAmmo(item)) {
-					//TODO: Play out of ammo sound
-					
+					//DONE: Play out of ammo sound
+					this.gunData.getOutOfAmmoSound().play(event.getPlayer().getWorld(), event.getPlayer().getLocation());
 					
 				}
 				//TODO: Spawn additional projectiles when <shot delay> < <Current tick time>, also needs to adjust the "future"
 				else {
-					this.onShoot(item, event);
 					//Since the cooldown is over, let's check if we were reloading
 					if(AbstractGun.isReloading(item)) {
+						//Remove ammo items
+						int currentAmmo = AbstractGun.getRemainingAmmo(item);
+						int ammoToRemove = this.getMaxAmmo() - currentAmmo;
+						
 						//We were reloading, let's remove the flag
-						if(!ItemDataUtil.tryRemoveData(RELOADING_DATA_KEY, item)) {
-							//Something went wrong => TODO: Log this shit :D
-						}
-					}
+						cancelReload(item, event.getPlayer().getInventory());
+					} 
+					this.onShoot(item, event);
 					this.updateItemMagazine(item);
 					//Let's add the shot cooldown to the item
 					long future = System.currentTimeMillis() + this.getShotDelay();
@@ -162,7 +168,7 @@ public abstract class AbstractGun extends CustomItemBase {
 					}
 				}
 			} else if(AbstractGun.isReloading(item)) {
-				this.removeReloadingMarkerOnItemMovement(item);
+				this.cancelReload(item, event.getPlayer().getInventory());
 			}
 		}
 		event.setCancelled(true);
@@ -196,6 +202,8 @@ public abstract class AbstractGun extends CustomItemBase {
 				if(this.checkReload(item, event.getPlayer())) {
 					ItemDataUtil.trySetPersistentLong(COOLDOWN_DATA_KEY, System.currentTimeMillis() + this.getReloadTime(), item);
 					ItemDataUtil.trySetPersistentString(RELOADING_DATA_KEY, Boolean.TRUE.toString(), item);
+					
+					this.gunData.getReloadingSound().play(event.getPlayer().getWorld(), event.getPlayer().getLocation());
 				}
 			}
 			event.setCancelled(true);
@@ -213,8 +221,18 @@ public abstract class AbstractGun extends CustomItemBase {
 			return false;
 		}
 		//TODO: Remove ammo items WHEN RELOAD IS FINISHED
-		//TODO: Add "used during reload" marker on ALL AMMO ITEMS of the needed ammo, that is to prevent the player removing the ammo before the reloading is over
+		//DONE: Add "used during reload" marker on ALL AMMO ITEMS of the needed ammo, that is to prevent the player removing the ammo before the reloading is over
+		for(ItemStack stack : player.getInventory().getContents()) {
+			Optional<ItemAmmunition> itemAmmo = DTArmory.AMMO_REGISTRY.getEntry(stack);
+			if(itemAmmo.isPresent() && this.isAmmoValid(itemAmmo.get())) {
+				ItemAmmunition.markStackAsRequiredForReload(stack);
+			}
+		}
 		return true;
+	}
+
+	public ItemAmmunition getRequiredAmmo() {
+		return this.requiredAmmo;
 	}
 
 	protected boolean hasAmmo(ItemStack item) {
@@ -223,12 +241,12 @@ public abstract class AbstractGun extends CustomItemBase {
 
 	@Override
 	public void onInventoryClick(ItemStack item, InventoryClickEvent event) {
-		this.removeReloadingMarkerOnItemMovement(item);
+		this.cancelReload(item, event.getInventory());
 	}
 
 	@Override
 	public void onInventoryDrag(ItemStack item, InventoryDragEvent event) {
-		this.removeReloadingMarkerOnItemMovement(item);
+		this.cancelReload(item, event.getInventory());
 	}
 
 	@Override
@@ -238,32 +256,40 @@ public abstract class AbstractGun extends CustomItemBase {
 
 	@Override
 	public void onEquip(ItemStack item, PlayerItemHeldEvent event) {
-		this.removeReloadingMarkerOnItemMovement(item);
+		this.cancelReload(item, event.getPlayer().getInventory());
 	}
 
 	@Override
 	public void onUnequip(ItemStack item, PlayerItemHeldEvent event) {
-		this.removeReloadingMarkerOnItemMovement(item);
+		this.cancelReload(item, event.getPlayer().getInventory());
 	}
 
 	@Override
 	public void onSwapTo(EquipmentSlot newHand, boolean isDualWield, ItemStack item, PlayerSwapHandItemsEvent event) {
-		this.removeReloadingMarkerOnItemMovement(item);
+		this.cancelReload(item, event.getPlayer().getInventory());
 	}
 	
-	private void removeReloadingMarkerOnItemMovement(ItemStack item) {
+	/*
+	 * Removes the reload and cooldown marker and removes reload markings from the ammo items in the inventory
+	 */
+	private void cancelReload(ItemStack item, Inventory inventory) {
 		if(AbstractGun.isReloading(item)) {
 			if(!(ItemDataUtil.tryRemoveData(COOLDOWN_DATA_KEY, item) && ItemDataUtil.tryRemoveData(RELOADING_DATA_KEY, item))) {
 				//Something went wrong => TODO: Log this shit
+			}
+			for(ItemStack ammoStack : inventory.getContents()) {
+				try {
+					ItemAmmunition.removeRequiredForReloadMarking(ammoStack);
+				} catch(Exception ex) {
+					//Seems like something went wrong, well i don't care
+				}
 			}
 		}
 	}
 	
 	//Ammo handling
-	protected ItemAmmunition acceptedAmmo;
-	
 	protected boolean isAmmoValid(@Nonnull ItemAmmunition ammo) {
-		return this.acceptedAmmo == ammo;
+		return this.requiredAmmo == ammo;
 	}
 	
 	public boolean containsValidAmmo(@Nonnull Inventory inventory) {
