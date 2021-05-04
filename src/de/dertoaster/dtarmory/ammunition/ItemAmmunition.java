@@ -29,6 +29,7 @@ public class ItemAmmunition extends CustomItemBase {
 	protected final IDTArmoryAmmoData ammoData;
 	
 	public static final NamespacedKey SHOT_COUNT_DATA_KEY = new NamespacedKey(DTArmory.getInstance(), "dtarmory_ammo_shot_key");
+	public static final NamespacedKey MARKED_AS_RELOAD_AMMO_DATA_KEY = new NamespacedKey(DTArmory.getInstance(), "dtarmory_ammo_marked_for_reload_key");
 
 	public ItemAmmunition(final IDTArmoryAmmoData ammoData) {
 		super(ammoData.getItemIdent(), DTArmory.AMMO_REGISTRY);
@@ -76,22 +77,30 @@ public class ItemAmmunition extends CustomItemBase {
 
 	@Override
 	public void onDrop(ItemStack item, PlayerDropItemEvent event) {
-
+		if(hasRequiredForReloadMarking(item)) {
+			event.setCancelled(true);
+		}
 	}
 
 	@Override
 	public void onInventoryClick(ItemStack item, InventoryClickEvent event) {
-
+		if(hasRequiredForReloadMarking(item)) {
+			event.setCancelled(true);
+		}
 	}
 
 	@Override
 	public void onInventoryDrag(ItemStack item, InventoryDragEvent event) {
-
+		if(hasRequiredForReloadMarking(item)) {
+			event.setCancelled(true);
+		}
 	}
 
 	@Override
 	public void onDispense(ItemStack item, BlockDispenseEvent event) {
-
+		if(hasRequiredForReloadMarking(item)) {
+			event.setCancelled(true);
+		}
 	}
 
 	@Override
@@ -106,7 +115,7 @@ public class ItemAmmunition extends CustomItemBase {
 
 	@Override
 	public void onSwapTo(EquipmentSlot newHand, boolean isDualWield, ItemStack item, PlayerSwapHandItemsEvent event) {
-
+		
 	}
 	
 	public static int getShotsInAmmo(ItemStack item) {
@@ -133,6 +142,22 @@ public class ItemAmmunition extends CustomItemBase {
 			ItemDamageUtil.setDamagePercent(shots / this.ammoData.getShotCount(), result[i]);
 		}
 		return result;
+	}
+	
+	public static boolean markStackAsRequiredForReload(ItemStack stack) {
+		return ItemDataUtil.trySetPersistentBoolean(MARKED_AS_RELOAD_AMMO_DATA_KEY, true, stack);
+	}
+	
+	public static boolean removeRequiredForReloadMarking(ItemStack stack) {
+		return ItemDataUtil.tryRemoveData(MARKED_AS_RELOAD_AMMO_DATA_KEY, stack);
+	}
+	
+	public static boolean hasRequiredForReloadMarking(ItemStack stack) {
+		Optional<Boolean> val = ItemDataUtil.tryGetPersistentBoolean(MARKED_AS_RELOAD_AMMO_DATA_KEY, stack);
+		if(val.isPresent()) {
+			return val.get();
+		}
+		return false;
 	}
 
 }
